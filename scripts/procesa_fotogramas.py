@@ -1,4 +1,4 @@
-# %%
+#%%
 import glob
 import os
 from unittest.mock import Mock
@@ -21,7 +21,6 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from scipy.interpolate import UnivariateSpline
 from skimage import morphology
-
 
 #%%
 
@@ -53,6 +52,9 @@ class ExpertoImagen:
 
     
     def calculate_mask_parameters(self, mask):
+        if not np.any(mask):
+            return None
+
         heightMask, widthMask = mask.shape
 
         _, contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_TC89_L1)
@@ -128,9 +130,9 @@ class ExpertoImagen:
         kernel = np.ones((windowSize,windowSize)) / windowSize ** 2
         blurryImage = cv2.filter2D(img, -1, kernel, borderType = cv2.BORDER_REPLICATE)
         
-        plt.imshow(blurryImage, cmap = 'gray')
-        plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-        plt.show()
+        #plt.imshow(blurryImage, cmap = 'gray')
+        #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
+        #plt.show()
         #Morphological operations
         
         diskSize = 20
@@ -138,9 +140,9 @@ class ExpertoImagen:
         scale = cv2.convertScaleAbs(grayimg)
         ret2,th = cv2.threshold(scale,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
         #ret2,th = cv2.threshold(np.array(blurryImage,dtype='float32'),0,1,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-        plt.imshow(th, cmap = 'gray')
-        plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-        plt.show()
+        #plt.imshow(th, cmap = 'gray')
+        #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
+        #plt.show()
         
 #        
         mask_depth = th.astype(bool)
@@ -170,9 +172,9 @@ class ExpertoImagen:
 #        
         
         cleaned = morphology.remove_small_objects(mask, min_size=500, connectivity=1)
-        plt.imshow(cleaned, cmap = 'gray')
-        plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-        plt.show()
+        #plt.imshow(cleaned, cmap = 'gray')
+        #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
+        #plt.show()
         
         
         cleaned2 = cleaned.astype(np.uint8)*255
@@ -193,19 +195,22 @@ class ExpertoImagen:
         # Combine the two images to get the foreground.
         im_out = cleaned2 | im_floodfill_inv
         
-        plt.imshow(im_out, cmap = 'gray')
-        plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-        plt.show()
+        #plt.imshow(im_out, cmap = 'gray')
+        #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
+        #plt.show()
         
         
         label_img = morphology.label(im_out,connectivity=1)
         size = np.bincount(label_img.ravel())
+        if len(size) == 1:
+            return np.zeros_like(grayimg)
         biggest_label = size[1:].argmax() + 1
+
         clump_mask = label_img == biggest_label
         
-        plt.imshow(clump_mask, cmap = 'gray')
-        plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-        plt.show()
+        # plt.imshow(clump_mask, cmap = 'gray')
+        # plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
+        # plt.show()
         
         selem = morphology.disk(diskSize)
         
@@ -215,27 +220,29 @@ class ExpertoImagen:
         eroded = cv2.erode(clump_maskA,selem)
         
         
-        plt.imshow(eroded, cmap = 'gray')
-        plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-        plt.show()
+        #plt.imshow(eroded, cmap = 'gray')
+        #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
+        #plt.show()
         
         label2_img = morphology.label(eroded,connectivity=1)
         size2 = np.bincount(label2_img.ravel())
+        if len(size2) == 1:
+            return np.zeros_like(grayimg)
         biggest_label2 = size2[1:].argmax() + 1
         clump_mask2 = label2_img == biggest_label2
         
-        plt.imshow(clump_mask2, cmap = 'gray')
-        plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-        plt.show()
+        #plt.imshow(clump_mask2, cmap = 'gray')
+        #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
+        #plt.show()
         
         clump_mask2A = clump_mask2.astype(np.uint8)*255
         mask = cv2.dilate(clump_mask2A,selem)
         
         #cv2.imwrite(os.path.join('/Users/Enrique/Google Drive Uni/Test/', 'Prueba2.jpg'), mask)
         
-        plt.imshow(mask, cmap = 'gray')
-        plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-        plt.show()
+        #plt.imshow(mask, cmap = 'gray')
+        #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
+        #plt.show()
         
         # Using the depth image as a mask
         
@@ -261,6 +268,7 @@ class Procesador:
         self.experto_imagen.parent_window.camera.max_depth = 1150
          
     def procesa_image(self, depth_filename, color_filename, directorio):
+        # print(depth_filename)
         color_image = np.load(color_filename)
         depth_image = np.load(depth_filename)
         depth_colorized = cv2.applyColorMap(np.uint8(cv2.normalize(depth_image, None, 0, 255, cv2.NORM_MINMAX)), 
@@ -289,10 +297,10 @@ class Procesador:
 
         return mask_parameters['area']
 
-#%%
-color_filename = '/Users/Enrique/Google Drive Uni/Test/c7e508eb3f1c46eb9e36c68bd44ba083.npy'
-depth_filename = '/Users/Enrique/Google Drive Uni/Test/c7e508eb3f1c46eb9e36c68bd44ba083.npy copia'
-directorio = '/Users/Enrique/Google Drive Uni/Test/'
-
-x = Procesador()
-result1= x.procesa_image(depth_filename, color_filename, directorio)
+# #%%
+# color_filename = ''
+# depth_filename = '/Users/Enrique/Google Drive Uni/Test/c7e508eb3f1c46eb9e36c68bd44ba083.npy copia'
+# directorio = '/Users/Enrique/Google Drive Uni/Test/'
+#
+# x = Procesador()
+# result1= x.procesa_image(depth_filename, color_filename, directorio)
