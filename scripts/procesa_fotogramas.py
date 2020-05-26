@@ -5,6 +5,7 @@ from unittest.mock import Mock
 import cv2 
 import pyrealsense2 as rs
 import numpy as np
+import math
 
 import pandas as pd
 
@@ -21,6 +22,8 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from scipy.interpolate import UnivariateSpline
 from skimage import morphology
+from skimage.measure import label, regionprops
+import imutils
 
 #%%
 
@@ -114,12 +117,93 @@ class ExpertoImagen:
         area_mascara_pixeles = cv.countNonZero(mask)
         area_mascara_real = area_mascara_pixeles * escala
 
+        # Area de la elipse
+        cnt = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        cnt = imutils.grab_contours(cnt)
+        contours = []
+        for c in cnt:
+            area = cv2.contourArea(c)
+            if area > 10000:
+                contours.append(c)
+
+        (x, y), (MA, ma), angle = cv2.fitEllipse(min(contours))
+
+        elipse = cv2.ellipse(mask, (int(x), int(y)), (int(MA / 2), int(ma / 2)), angle, 0, 360, (255, 0, 0), 2)
+
+        angle_radians = math.radians(angle)
+        h2 = math.cos(angle_radians) * ma / 2
+        w2 = math.sin(angle_radians) * ma / 2
+        #mask_w = cv2.line(mask_w, (int(x + w2), int(y - h2)), (int(x - w2), int(y + h2)), (0, 255, 0), 2)
+        h1 = math.sin(angle_radians) * MA / 2
+        w1 = - math.cos(angle_radians) * MA / 2
+        #mask_w = cv2.line(mask_w, (int(x + w1), int(y - h1)), (int(x - w1), int(y + h1)), (0, 255, 0), 2)
+
+        label_img = label(elipse)
+        regions = regionprops(label_img)
+        if (len(regions) == 1):
+            props = regions[0]
+        else:
+            print("Problem with regions")
+            exit()
+
+        # Cuadrado
+        minr, minc, maxr, maxc = props.bbox
+
+        # Porcentaje Area cuadrado vs cordero
+        area_lamb = cv2.contourArea(min(contours))
+        percent_area = (area_lamb * 100) / props.bbox_area
+
+        # Distancia centro de la elipse vs centro imagen
+        c_img = [mask.shape[1] / 2, mask.shape[0] / 2]
+        c_eli = [props.centroid[1], props.centroid[0]]
+        distance = math.sqrt(((c_img[0] - c_eli[0]) ** 2) + ((c_img[1] - c_eli[1]) ** 2))
+
+        # Excentricidad: Momento del centro del area con el centro de la elipse (distancia)
+        M = cv2.moments(min(contours))
+        cx = int(M['m10'] / M['m00'])
+        cy = int(M['m01'] / M['m00'])
+        c_lamb = [cx, cy]
+        c_eli = [props.centroid[1], props.centroid[0]]
+        distance_ex = math.sqrt(((c_lamb[0] - c_eli[0]) ** 2) + ((c_lamb[1] - c_eli[1]) ** 2))
+
+        # Perimetro del area del cordero
+        perimeter = cv2.arcLength(min(contours), True)
+
+        # Simetria del cordero (% de pixeles entre un lado y otro)
+        mask_curv = cv2.line(mask, (int(x + (w2 * 1.1)), int(y - (h2 * 1.1))),
+                               (int(x - (w2 * 1.1)), int(y + (h2 * 1.1))), (0, 0, 0), 2)
+        label_img_curv = label(mask_curv)
+        regions_curv = regionprops(label_img_curv)
+        curv = []
+        for r in regions_curv:
+            if r.area >= 200:
+                area_c = r.area
+                curv.append(area_c)
+
+        curv = sorted(curv)
+        if len(curv) >= 3:
+            sum = 0
+            for i in range(0, len(curv) - 1):
+                sum = sum + curv[i]
+            curvature = sum / max(curv)
+        else:
+            curvature = min(curv) / max(curv)
+
         return {'area': area_mascara_real,
                 'x': img_coord_x_up_left_corner,
                 'y': img_coord_y_up_left_corner,
                 'width': width,
                 'height': height,
-                'contours': contours}
+                'contours': contours,
+                'major axis': MA,
+                'minor axis': ma,
+                'centroid': props.centroid,
+                'orientation': props.orientation,
+                '% area': percent_area,
+                'center distance': distance,
+                'excentricity': distance_ex,
+                'perimeter': perimeter,
+                'curvature coef': curvature}
 
 
     def get_foreground_mask_fast_strategy(self):
@@ -295,7 +379,7 @@ class Procesador:
         output_filename = os.path.join(directorio, os.path.basename(depth_filename).replace('.npy', '_mosaico.png'))
         cv2.imwrite(output_filename, mosaico_imagen)
 
-        return mask_parameters['area']
+        return mask_parameters
 
 # #%%
 # color_filename = ''
