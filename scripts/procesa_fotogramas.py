@@ -2,7 +2,7 @@
 import glob
 import os
 from unittest.mock import Mock
-import cv2 
+import cv2
 import pyrealsense2 as rs
 import numpy as np
 import math
@@ -44,7 +44,7 @@ class ExpertoImagen:
         camera.depth_image[camera.depth_image < camera.min_depth] = 0
         camera.depth_image[camera.depth_image > camera.max_depth] = 0
 
-    
+
     def calculate_bounding_rectangle(self, image, parameters):
         x = parameters['x']
         y = parameters['y']
@@ -53,7 +53,7 @@ class ExpertoImagen:
         cv.rectangle(image, (x, y), (x + width - 1, y + height - 1), (0, 255, 0), 2)
         return image
 
-    
+
     def calculate_mask_parameters(self, mask):
         if not np.any(mask):
             return None
@@ -89,7 +89,7 @@ class ExpertoImagen:
             return None
         camera = self.parent_window.camera
         depth_value = cv.mean(camera.depth_image, mask)[0]
-        
+
         up_right_corner = rs.rs2_deproject_pixel_to_point(camera.intrinsics,
                                                           [img_coord_x_up_right_corner,
                                                            img_coord_y_up_right_corner],
@@ -207,18 +207,18 @@ class ExpertoImagen:
 
 
     def get_foreground_mask_fast_strategy(self):
-        
+
         img = cv2.normalize(self.parent_window.camera.color_image, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-        
+
         windowSize = 25
         kernel = np.ones((windowSize,windowSize)) / windowSize ** 2
         blurryImage = cv2.filter2D(img, -1, kernel, borderType = cv2.BORDER_REPLICATE)
-        
+
         #plt.imshow(blurryImage, cmap = 'gray')
         #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
         #plt.show()
         #Morphological operations
-        
+
         diskSize = 20
         grayimg = cv2.cvtColor(blurryImage, cv2.COLOR_BGR2GRAY)
         scale = cv2.convertScaleAbs(grayimg)
@@ -227,13 +227,13 @@ class ExpertoImagen:
         #plt.imshow(th, cmap = 'gray')
         #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
         #plt.show()
-        
-#        
+
+#
         mask_depth = th.astype(bool)
 
         # Removing small objects
         cleaned_mask_depth = morphology.remove_small_objects(mask_depth, min_size=500, connectivity=1)
-        
+
         # Each object is labelled with a number from 0 to number of regions - 1
         ret, markers = cv.connectedComponents(cleaned_mask_depth.astype(np.uint8) * 255)
         markers = markers + 1  # So we will label background as 0 and regions from 1 to number of regions
@@ -253,37 +253,37 @@ class ExpertoImagen:
                 markers[markers == label] = 0
         # Applying the mask to the image a segmented image is obtained
         mask = markers.astype(np.uint8) * 255
-#        
-        
+#
+
         cleaned = morphology.remove_small_objects(mask, min_size=500, connectivity=1)
         #plt.imshow(cleaned, cmap = 'gray')
         #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
         #plt.show()
-        
-        
+
+
         cleaned2 = cleaned.astype(np.uint8)*255
         # Copy the thresholded image.
         im_floodfill = cleaned2.copy()
-         
+
         # Mask used to flood filling.
         # Notice the size needs to be 2 pixels than the image.
         h, w = cleaned2.shape[:2]
         mask = np.zeros((h+2, w+2), np.uint8)
-         
+
         # Floodfill from point (0, 0)
         cv2.floodFill(im_floodfill, mask, (0,0), 255);
-         
+
         # Invert floodfilled image
         im_floodfill_inv = cv2.bitwise_not(im_floodfill)
-         
+
         # Combine the two images to get the foreground.
         im_out = cleaned2 | im_floodfill_inv
-        
+
         #plt.imshow(im_out, cmap = 'gray')
         #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
         #plt.show()
-        
-        
+
+
         label_img = morphology.label(im_out,connectivity=1)
         size = np.bincount(label_img.ravel())
         if len(size) == 1:
@@ -291,51 +291,51 @@ class ExpertoImagen:
         biggest_label = size[1:].argmax() + 1
 
         clump_mask = label_img == biggest_label
-        
+
         # plt.imshow(clump_mask, cmap = 'gray')
         # plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
         # plt.show()
-        
+
         selem = morphology.disk(diskSize)
-        
+
         ##%%
         clump_maskA = clump_mask.astype(np.uint8)*255
         #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(diskSize,diskSize))
         eroded = cv2.erode(clump_maskA,selem)
-        
-        
+
+
         #plt.imshow(eroded, cmap = 'gray')
         #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
         #plt.show()
-        
+
         label2_img = morphology.label(eroded,connectivity=1)
         size2 = np.bincount(label2_img.ravel())
         if len(size2) == 1:
             return np.zeros_like(grayimg)
         biggest_label2 = size2[1:].argmax() + 1
         clump_mask2 = label2_img == biggest_label2
-        
+
         #plt.imshow(clump_mask2, cmap = 'gray')
         #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
         #plt.show()
-        
+
         clump_mask2A = clump_mask2.astype(np.uint8)*255
         mask = cv2.dilate(clump_mask2A,selem)
-        
+
         #cv2.imwrite(os.path.join('/Users/Enrique/Google Drive Uni/Test/', 'Prueba2.jpg'), mask)
-        
+
         #plt.imshow(mask, cmap = 'gray')
         #plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
         #plt.show()
-        
+
         # Using the depth image as a mask
-        
+
         return mask
-    
-    
+
+
 #%%
-        
-    
+
+
 class Procesador:
     def __init__(self):
         self.experto_imagen=ExpertoImagen(parent_window=Mock(), width=848, height=480)
@@ -350,17 +350,17 @@ class Procesador:
         self.experto_imagen.parent_window.camera.intrinsics.model = rs.distortion.brown_conrady
         self.experto_imagen.parent_window.camera.min_depth = 150
         self.experto_imagen.parent_window.camera.max_depth = 1150
-         
+
     def procesa_image(self, depth_filename, color_filename, directorio):
         # print(depth_filename)
         color_image = np.load(color_filename)
         depth_image = np.load(depth_filename)
-        depth_colorized = cv2.applyColorMap(np.uint8(cv2.normalize(depth_image, None, 0, 255, cv2.NORM_MINMAX)), 
+        depth_colorized = cv2.applyColorMap(np.uint8(cv2.normalize(depth_image, None, 0, 255, cv2.NORM_MINMAX)),
                                             cv2.COLORMAP_JET)
 
         self.experto_imagen.parent_window.camera.color_image = color_image
         self.experto_imagen.parent_window.camera.depth_image = depth_image
-        
+
         mask = self.experto_imagen.create_mask(strategy='fast')
         if mask is None:
             return None
