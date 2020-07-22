@@ -27,7 +27,7 @@ import imutils
 
 #%%
 
-class ExpertoImagen:
+class ImageExpert:
     def __init__(self, parent_window, width, height):
         self.parent_window = parent_window
         self.centre_x, self.centre_y = width // 2, height // 2
@@ -35,6 +35,11 @@ class ExpertoImagen:
     def create_mask(self, strategy='fast'):
         self.clip_depth_image()
         mask = self.get_foreground_mask_fast_strategy()
+        """
+        selem = morphology.disk(60)
+        mask = cv.erode(mask,selem)
+        mask = cv.dilate(mask,selem)
+        """
         return mask
 
     def clip_depth_image(self):
@@ -59,8 +64,7 @@ class ExpertoImagen:
             return None
 
         heightMask, widthMask = mask.shape
-
-        _, contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_TC89_L1)
+        contours, hierarchy = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_TC89_L1)
         if not contours:
             return None
 
@@ -87,6 +91,7 @@ class ExpertoImagen:
         if not are_corners_within:
             print('corners not within')
             return None
+
         camera = self.parent_window.camera
         depth_value = cv.mean(camera.depth_image, mask)[0]
 
@@ -117,16 +122,22 @@ class ExpertoImagen:
         area_mascara_pixeles = cv.countNonZero(mask)
         area_mascara_real = area_mascara_pixeles * escala
 
-        # Area de la elipse
+
+        # Elllipse
         cnt = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
         cnt = imutils.grab_contours(cnt)
-        contours = []
+        contours = None
+        countour_area = 0
         for c in cnt:
             area = cv2.contourArea(c)
-            if area > 10000:
-                contours.append(c)
+            if area > 10000 and area > countour_area:
+                contours= c
+                countour_area = area
 
-        (x, y), (MA, ma), angle = cv2.fitEllipse(min(contours))
+        if countour_area == 0:
+            return None
+
+        (x, y), (MA, ma), angle = cv2.fitEllipse(contours)
 
         elipse = cv2.ellipse(mask, (int(x), int(y)), (int(MA / 2), int(ma / 2)), angle, 0, 360, (255, 0, 0), 2)
 
@@ -143,14 +154,13 @@ class ExpertoImagen:
         if (len(regions) == 1):
             props = regions[0]
         else:
-            print("Problem with regions")
-            exit()
+            return None
 
         # Cuadrado
         minr, minc, maxr, maxc = props.bbox
 
         # Porcentaje Area cuadrado vs cordero
-        area_lamb = cv2.contourArea(min(contours))
+        area_lamb = cv2.contourArea(contours)
         percent_area = (area_lamb * 100) / props.bbox_area
 
         # Distancia centro de la elipse vs centro imagen
@@ -159,7 +169,7 @@ class ExpertoImagen:
         distance = math.sqrt(((c_img[0] - c_eli[0]) ** 2) + ((c_img[1] - c_eli[1]) ** 2))
 
         # Excentricidad: Momento del centro del area con el centro de la elipse (distancia)
-        M = cv2.moments(min(contours))
+        M = cv2.moments(contours)
         cx = int(M['m10'] / M['m00'])
         cy = int(M['m01'] / M['m00'])
         c_lamb = [cx, cy]
@@ -167,7 +177,7 @@ class ExpertoImagen:
         distance_ex = math.sqrt(((c_lamb[0] - c_eli[0]) ** 2) + ((c_lamb[1] - c_eli[1]) ** 2))
 
         # Perimetro del area del cordero
-        perimeter = cv2.arcLength(min(contours), True)
+        perimeter = cv2.arcLength(contours, True)
 
         # Simetria del cordero (% de pixeles entre un lado y otro)
         mask_curv = cv2.line(mask, (int(x + (w2 * 1.1)), int(y - (h2 * 1.1))),
@@ -194,7 +204,7 @@ class ExpertoImagen:
                 'y': img_coord_y_up_left_corner,
                 'width': width,
                 'height': height,
-                'contours': contours,
+                #'contours': contours,
                 'major axis': MA,
                 'minor axis': ma,
                 'centroid': props.centroid,
@@ -336,55 +346,60 @@ class ExpertoImagen:
 #%%
 
 
-class Procesador:
+class Processor:
     def __init__(self):
-        self.experto_imagen=ExpertoImagen(parent_window=Mock(), width=848, height=480)
-        self.experto_imagen.parent_window.camera = Mock()
-        self.experto_imagen.parent_window.camera.intrinsics = rs.intrinsics()
-        self.experto_imagen.parent_window.camera.intrinsics.width = 848
-        self.experto_imagen.parent_window.camera.intrinsics.height = 480
-        self.experto_imagen.parent_window.camera.intrinsics.fx = 424.5785827636719
-        self.experto_imagen.parent_window.camera.intrinsics.fy = 424.5785827636719
-        self.experto_imagen.parent_window.camera.intrinsics.ppx = 422.18994140625
-        self.experto_imagen.parent_window.camera.intrinsics.ppy = 244.84666442871094
-        self.experto_imagen.parent_window.camera.intrinsics.model = rs.distortion.brown_conrady
-        self.experto_imagen.parent_window.camera.min_depth = 150
-        self.experto_imagen.parent_window.camera.max_depth = 1150
+        self.image_expert=ImageExpert(parent_window=Mock(), width=848, height=480)
+        self.image_expert.parent_window.camera = Mock()
+        self.image_expert.parent_window.camera.intrinsics = rs.intrinsics()
+        self.image_expert.parent_window.camera.intrinsics.width = 848
+        self.image_expert.parent_window.camera.intrinsics.height = 480
+        self.image_expert.parent_window.camera.intrinsics.fx = 424.5785827636719
+        self.image_expert.parent_window.camera.intrinsics.fy = 424.5785827636719
+        self.image_expert.parent_window.camera.intrinsics.ppx = 422.18994140625
+        self.image_expert.parent_window.camera.intrinsics.ppy = 244.84666442871094
+        self.image_expert.parent_window.camera.intrinsics.model = rs.distortion.brown_conrady
+        self.image_expert.parent_window.camera.min_depth = 150
+        self.image_expert.parent_window.camera.max_depth = 1150
 
-    def procesa_image(self, depth_filename, color_filename, directorio):
-        # print(depth_filename)
+    def process_image(self, depth_filename, color_filename, mosaic_path):
         color_image = np.load(color_filename)
         depth_image = np.load(depth_filename)
         depth_colorized = cv2.applyColorMap(np.uint8(cv2.normalize(depth_image, None, 0, 255, cv2.NORM_MINMAX)),
                                             cv2.COLORMAP_JET)
 
-        self.experto_imagen.parent_window.camera.color_image = color_image
-        self.experto_imagen.parent_window.camera.depth_image = depth_image
+        self.image_expert.parent_window.camera.color_image = color_image
+        self.image_expert.parent_window.camera.depth_image = depth_image
 
-        mask = self.experto_imagen.create_mask(strategy='fast')
+        mask = self.image_expert.create_mask(strategy='fast')
         if mask is None:
             return None
-        mask_parameters = self.experto_imagen.calculate_mask_parameters(mask)
+        mask_parameters = self.image_expert.calculate_mask_parameters(mask)
         if mask_parameters is None:
             return None
 
         foreground_image = cv2.bitwise_and(color_image, color_image, mask=mask)
-        rectangle_image = self.experto_imagen.calculate_bounding_rectangle(image=foreground_image, parameters=mask_parameters)
+        rectangle_image = self.image_expert.calculate_bounding_rectangle(image=foreground_image, parameters=mask_parameters)
 
         fig_1 = cv2.cvtColor(color_image, cv2.COLOR_RGB2BGR)
         fig_2 = cv2.cvtColor(depth_colorized, cv2.COLOR_RGB2BGR)
         fig_3 = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
         fig_4 = cv2.cvtColor(rectangle_image, cv2.COLOR_RGB2BGR)
         mosaico_imagen = cv2.vconcat([cv2.hconcat([fig_1, fig_2]), cv2.hconcat([fig_3, fig_4 ])])
-        output_filename = os.path.join(directorio, os.path.basename(depth_filename).replace('.npy', '_mosaico.png'))
+        output_filename = os.path.join(mosaic_path, os.path.basename(depth_filename).replace('.npy', '_mosaico.png'))
         cv2.imwrite(output_filename, mosaico_imagen)
 
-        return mask_parameters
-
-# #%%
-# color_filename = ''
-# depth_filename = '/Users/Enrique/Google Drive Uni/Test/c7e508eb3f1c46eb9e36c68bd44ba083.npy copia'
-# directorio = '/Users/Enrique/Google Drive Uni/Test/'
-#
-# x = Procesador()
-# result1= x.procesa_image(depth_filename, color_filename, directorio)
+        return [mask_parameters['area'],
+                mask_parameters['x'],
+                mask_parameters['y'],
+                mask_parameters['width'],
+                mask_parameters['height'],
+                #mask_parameters['contours'],
+                mask_parameters['major axis'],
+                mask_parameters['minor axis'],
+                mask_parameters['centroid'],
+                mask_parameters['orientation'],
+                mask_parameters['% area'],
+                mask_parameters['center distance'],
+                mask_parameters['excentricity'],
+                mask_parameters['perimeter'],
+                mask_parameters['curvature coef']]
