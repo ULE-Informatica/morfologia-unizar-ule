@@ -7,3 +7,4 @@ opencv-python
 scikit-image
 pyrealsense2
 tqdm
+seaborn
