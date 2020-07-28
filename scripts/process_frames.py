@@ -35,11 +35,6 @@ class ImageExpert:
     def create_mask(self, strategy='fast'):
         self.clip_depth_image()
         mask = self.get_foreground_mask_fast_strategy()
-        """
-        selem = morphology.disk(60)
-        mask = cv.erode(mask,selem)
-        mask = cv.dilate(mask,selem)
-        """
         return mask
 
     def clip_depth_image(self):
@@ -89,7 +84,7 @@ class ImageExpert:
                               )
 
         if not are_corners_within:
-            print('corners not within')
+            #print('corners not within')
             return None
 
         camera = self.parent_window.camera
@@ -156,19 +151,19 @@ class ImageExpert:
         else:
             return None
 
-        # Cuadrado
+        # Bounding box
         minr, minc, maxr, maxc = props.bbox
 
-        # Porcentaje Area cuadrado vs cordero
+        # Percentage Bounding box VS Lamb
         area_lamb = cv2.contourArea(contours)
         percent_area = (area_lamb * 100) / props.bbox_area
 
-        # Distancia centro de la elipse vs centro imagen
+        # Distance ellipse center VS image center
         c_img = [mask.shape[1] / 2, mask.shape[0] / 2]
         c_eli = [props.centroid[1], props.centroid[0]]
         distance = math.sqrt(((c_img[0] - c_eli[0]) ** 2) + ((c_img[1] - c_eli[1]) ** 2))
 
-        # Excentricidad: Momento del centro del area con el centro de la elipse (distancia)
+        # Eccentricity: Moment of the center of the area with the center of the ellipse (distance)
         M = cv2.moments(contours)
         cx = int(M['m10'] / M['m00'])
         cy = int(M['m01'] / M['m00'])
@@ -176,10 +171,10 @@ class ImageExpert:
         c_eli = [props.centroid[1], props.centroid[0]]
         distance_ex = math.sqrt(((c_lamb[0] - c_eli[0]) ** 2) + ((c_lamb[1] - c_eli[1]) ** 2))
 
-        # Perimetro del area del cordero
+        # Perimeter of the lamb area
         perimeter = cv2.arcLength(contours, True)
 
-        # Simetria del cordero (% de pixeles entre un lado y otro)
+        # Symmetry of the lamb (% of pixels between one side and the other)
         mask_curv = cv2.line(mask, (int(x + (w2 * 1.1)), int(y - (h2 * 1.1))),
                                (int(x - (w2 * 1.1)), int(y + (h2 * 1.1))), (0, 0, 0), 2)
         label_img_curv = label(mask_curv)
@@ -396,7 +391,8 @@ class Processor:
                 #mask_parameters['contours'],
                 mask_parameters['major axis'],
                 mask_parameters['minor axis'],
-                mask_parameters['centroid'],
+                mask_parameters['centroid'][0],
+                mask_parameters['centroid'][1],
                 mask_parameters['orientation'],
                 mask_parameters['% area'],
                 mask_parameters['center distance'],
