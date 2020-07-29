@@ -24,6 +24,7 @@ from scipy.interpolate import UnivariateSpline
 from skimage import morphology
 from skimage.measure import label, regionprops
 import imutils
+import datetime
 
 #%%
 
@@ -131,8 +132,36 @@ class ImageExpert:
 
         if countour_area == 0:
             return None
-
         (x, y), (MA, ma), angle = cv2.fitEllipse(contours)
+
+        # symmetry
+        matrix = cv2.getRotationMatrix2D( center=(x,y), angle=angle, scale=1 )
+        image = cv2.warpAffine( src=mask, M=matrix, dsize=(mask.shape[1]+200, mask.shape[0]+200) )
+        MA_2 = int(MA/2)
+        ma_2 = int(ma/2)
+        x_int = int(x)
+        y_int = int(y)
+        x_sim = x_int - MA_2
+        y_sim = y_int - ma_2
+        x_sim2 = x_sim+int(MA)
+        y_sim2 = y_sim+int(ma)
+        if(x_sim<0):
+            x_sim=int(0)
+        if(y_sim<0):
+            y_sim=int(0)
+        image_bbox = image[y_sim:y_sim2, x_sim:x_sim2]
+
+        image_part1 = image[y_sim:y_sim2, x_sim:int(x)]
+        image_part2 = image[y_sim:y_sim2, int(x):x_sim2]
+        mirror=cv2.flip(image_part2,1)
+        if(image_part1.shape[0]!=mirror.shape[0]):
+            mirror = mirror[:image_part1.shape[0], :]
+        if(image_part1.shape[1]!=mirror.shape[1]):
+            mirror = mirror[:,:image_part1.shape[1]]
+        union = cv2.bitwise_and(image_part1,image_part1,mask=mirror)
+        union_pixels = cv.countNonZero(union)
+        mask_pixels = cv.countNonZero(mask)
+        symmetry = 2*union_pixels/mask_pixels
 
         elipse = cv2.ellipse(mask, (int(x), int(y)), (int(MA / 2), int(ma / 2)), angle, 0, 360, (255, 0, 0), 2)
 
@@ -174,6 +203,7 @@ class ImageExpert:
         # Perimeter of the lamb area
         perimeter = cv2.arcLength(contours, True)
 
+        """
         # Symmetry of the lamb (% of pixels between one side and the other)
         mask_curv = cv2.line(mask, (int(x + (w2 * 1.1)), int(y - (h2 * 1.1))),
                                (int(x - (w2 * 1.1)), int(y + (h2 * 1.1))), (0, 0, 0), 2)
@@ -193,6 +223,7 @@ class ImageExpert:
             curvature = sum / max(curv)
         else:
             curvature = min(curv) / max(curv)
+        """
 
         return {'area': area_mascara_real,
                 'x': img_coord_x_up_left_corner,
@@ -208,7 +239,7 @@ class ImageExpert:
                 'center distance': distance,
                 'excentricity': distance_ex,
                 'perimeter': perimeter,
-                'curvature coef': curvature}
+                'symmetry': symmetry}
 
 
     def get_foreground_mask_fast_strategy(self):
@@ -398,4 +429,4 @@ class Processor:
                 mask_parameters['center distance'],
                 mask_parameters['excentricity'],
                 mask_parameters['perimeter'],
-                mask_parameters['curvature coef']]
+                mask_parameters['symmetry']]
