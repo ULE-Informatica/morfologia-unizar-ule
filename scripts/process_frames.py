@@ -193,12 +193,15 @@ class ImageExpert:
         distance = math.sqrt(((c_img[0] - c_eli[0]) ** 2) + ((c_img[1] - c_eli[1]) ** 2))
 
         # Eccentricity: Moment of the center of the area with the center of the ellipse (distance)
+        """
         M = cv2.moments(contours)
         cx = int(M['m10'] / M['m00'])
         cy = int(M['m01'] / M['m00'])
         c_lamb = [cx, cy]
         c_eli = [props.centroid[1], props.centroid[0]]
         distance_ex = math.sqrt(((c_lamb[0] - c_eli[0]) ** 2) + ((c_lamb[1] - c_eli[1]) ** 2))
+        """
+        eccentricity = math.sqrt(abs(((MA/2)**2)-((ma/2)**2)))
 
         # Perimeter of the lamb area
         perimeter = cv2.arcLength(contours, True)
@@ -237,7 +240,7 @@ class ImageExpert:
                 'orientation': props.orientation,
                 '% area': percent_area,
                 'center distance': distance,
-                'excentricity': distance_ex,
+                'eccentricity': eccentricity,
                 'perimeter': perimeter,
                 'symmetry': symmetry}
 
@@ -427,6 +430,6 @@ class Processor:
                 mask_parameters['orientation'],
                 mask_parameters['% area'],
                 mask_parameters['center distance'],
-                mask_parameters['excentricity'],
+                mask_parameters['eccentricity'],
                 mask_parameters['perimeter'],
                 mask_parameters['symmetry']]
