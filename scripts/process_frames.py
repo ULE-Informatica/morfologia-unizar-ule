@@ -132,7 +132,13 @@ class ImageExpert:
 
         if countour_area == 0:
             return None
-        (x, y), (MA, ma), angle = cv2.fitEllipse(contours)
+        (x, y), (axis_x, axis_y), angle = cv2.fitEllipse(contours)
+        if axis_x > axis_y:
+            MA = axis_x
+            ma = axis_y
+        else:
+            MA = axis_y
+            ma = axis_x
 
         # symmetry
         matrix = cv2.getRotationMatrix2D( center=(x,y), angle=angle, scale=1 )
@@ -201,7 +207,7 @@ class ImageExpert:
         c_eli = [props.centroid[1], props.centroid[0]]
         distance_ex = math.sqrt(((c_lamb[0] - c_eli[0]) ** 2) + ((c_lamb[1] - c_eli[1]) ** 2))
         """
-        eccentricity = math.sqrt(abs(((MA/2)**2)-((ma/2)**2)))
+        eccentricity = math.sqrt(((MA/2)**2)-((ma/2)**2))/(MA/2)
 
         # Perimeter of the lamb area
         perimeter = cv2.arcLength(contours, True)
