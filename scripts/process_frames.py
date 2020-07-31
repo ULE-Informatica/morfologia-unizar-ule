@@ -169,8 +169,9 @@ class ImageExpert:
         mask_pixels = cv.countNonZero(mask)
         symmetry = 2*union_pixels/mask_pixels
 
-        elipse = cv2.ellipse(mask, (int(x), int(y)), (int(MA / 2), int(ma / 2)), angle, 0, 360, (255, 0, 0), 2)
+        elipse = cv2.ellipse(mask, (int(x), int(y)), (int(axis_x / 2), int(axis_y / 2)), angle, 0, 360, (255, 0, 0), 2)
 
+        """
         angle_radians = math.radians(angle)
         h2 = math.cos(angle_radians) * ma / 2
         w2 = math.sin(angle_radians) * ma / 2
@@ -178,6 +179,7 @@ class ImageExpert:
         h1 = math.sin(angle_radians) * MA / 2
         w1 = - math.cos(angle_radians) * MA / 2
         #mask_w = cv2.line(mask_w, (int(x + w1), int(y - h1)), (int(x - w1), int(y + h1)), (0, 255, 0), 2)
+        """
 
         label_img = label(elipse)
         regions = regionprops(label_img)
