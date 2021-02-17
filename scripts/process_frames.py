@@ -399,8 +399,8 @@ class Processor:
         self.image_expert.parent_window.camera.max_depth = 1150
 
     def process_image(self, depth_filename, color_filename, mosaic_path):
-        color_image = np.load(color_filename)
-        depth_image = np.load(depth_filename)
+        color_image = np.load(color_filename,allow_pickle=True)
+        depth_image = np.load(depth_filename,allow_pickle=True)
         depth_colorized = cv2.applyColorMap(np.uint8(cv2.normalize(depth_image, None, 0, 255, cv2.NORM_MINMAX)),
                                             cv2.COLORMAP_JET)
 
