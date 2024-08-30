@@ -22,7 +22,7 @@ VERSION = '1.0'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
-    'pandas', 'numpy',  'pipegraph', 'scikit-learn', 'opencv-python==4.2.0.32', 'scikit-image', 'pyrealsense2', 'tqdm', 'seaborn', 'matplotlib', 'imutils', 'kaggle'
+    'pandas', 'numpy',  'pipegraph', 'scikit-learn', 'opencv-python==4.8.1.78', 'scikit-image', 'pyrealsense2', 'tqdm', 'seaborn', 'matplotlib', 'imutils', 'kaggle'
 ]
 
 # What packages are optional?
